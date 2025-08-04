@@ -1,174 +1,155 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>服务状态监控（图表 + 分页）</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <title>18mh Status</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: sans-serif;
-      background: #f7f7f7;
-      color: #111;
-      max-width: 900px;
-      margin: auto;
-      padding: 2rem;
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: #f9f9f9;
+      color: #121212;
     }
-    h1 {
+    header {
+      background: #0b1120;
+      color: white;
+      padding: 1.5rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { margin: 0; font-size: 1.8rem; }
+    header small { font-size: 0.9rem; color: #ccc; }
+    .status-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+      margin: 2rem auto;
+      padding: 2rem;
+      max-width: 900px;
       text-align: center;
     }
-    .controls {
-      margin: 1rem 0;
+    .status-card h2 {
+      margin-top: 0.5rem;
+      font-size: 1.6rem;
+    }
+    .dot {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: #34d399;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .services {
+      margin: 3rem auto;
+      max-width: 900px;
+    }
+    .service-box {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .service-header {
       display: flex;
-      gap: 1rem;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+    }
+    .bar {
+      display: flex;
+      margin-top: 1rem;
+      gap: 2px;
       flex-wrap: wrap;
     }
-    input, select {
-      padding: 0.4rem 0.6rem;
-      font-size: 1rem;
+    .bar div {
+      width: 6px;
+      height: 20px;
+      background: #64748b;
+      border-radius: 2px;
     }
-    .stats, .pagination {
-      margin: 1rem 0;
-      font-weight: bold;
-    }
-    .service {
-      background: #fff;
-      border-left: 5px solid;
-      padding: 1rem;
-      margin: 1rem 0;
-      border-radius: 6px;
-    }
-    .up { border-color: green; }
-    .down { border-color: red; }
-    .pagination button {
-      margin-right: 8px;
-      padding: 0.3rem 0.7rem;
-    }
-    canvas {
-      margin-top: 2rem;
-      background: #fff;
-      border-radius: 6px;
-      padding: 1rem;
+    .bar div.active {
+      background: #34d399;
     }
   </style>
 </head>
 <body>
+  <header>
+    <h1>18mh</h1>
+    <div>
+      <div style="text-align:right;">
+        <div><strong>Service status</strong></div>
+        <small id="timeInfo">Last updated --:--:-- | Next update in 300 sec.</small>
+      </div>
+    </div>
+  </header>
 
-  <h1>服务状态监控</h1>
-
-  <div class="controls">
-    <input type="text" id="search" placeholder="🔍 搜索服务..." />
-    <select id="perPage">
-      <option value="5">每页 5 个</option>
-      <option value="10" selected>每页 10 个</option>
-      <option value="20">每页 20 个</option>
-    </select>
+  <div class="status-card">
+    <div class="dot"></div>
+    <h2>All systems <span style="color:#34d399">Operational</span></h2>
   </div>
 
-  <div class="stats" id="summary">加载中...</div>
-  <div id="status"></div>
-  <div class="pagination" id="pagination"></div>
-
-  <canvas id="uptimeChart" height="300"></canvas>
+  <div class="services">
+    <div class="service-box">
+      <div class="service-header">
+        <span>18mh.net &rarr; | <span style="color:#22c55e">100.00%</span></span>
+        <span style="color:#22c55e">&#x2022; Operational</span>
+      </div>
+      <div class="bar" id="barArea"></div>
+    </div>
+  </div>
 
   <script>
-    const API_URL = "https://quiet-meadow-d19c.mqqmengqiqi.workers.dev";
-    const statusDiv = document.getElementById("status");
-    const summary = document.getElementById("summary");
-    const searchInput = document.getElementById("search");
-    const paginationDiv = document.getElementById("pagination");
-    const perPageSelect = document.getElementById("perPage");
-    let chartInstance = null;
+    const barArea = document.getElementById('barArea');
+    const timeInfo = document.getElementById('timeInfo');
+    const MAX_BARS = 60; // 5分钟一个，共最多300分钟 = 5小时记录
+    let logs = [];
+    let countdown = 300;
 
-    let allData = [], currentPage = 1;
+    function drawBars() {
+      barArea.innerHTML = '';
+      logs.slice(-MAX_BARS).forEach(val => {
+        const div = document.createElement('div');
+        if (val === 'up') div.classList.add('active');
+        barArea.appendChild(div);
+      });
+    }
 
-    async function fetchStatus() {
-      summary.textContent = "加载中...";
-      statusDiv.innerHTML = "...";
+    async function checkService() {
+      const now = new Date();
+      timeInfo.textContent = `Last updated ${now.toLocaleTimeString()} | Next update in ${countdown} sec.`;
       try {
-        const res = await fetch(API_URL);
+        const res = await fetch("https://quiet-meadow-d19c.mqqmengqiqi.workers.dev");
         const json = await res.json();
-        allData = json.monitors || [];
-        currentPage = 1;
-        render();
-      } catch (err) {
-        statusDiv.innerHTML = `<p>获取失败：${err.message}</p>`;
-        summary.textContent = "加载失败";
+        const status = json.monitors?.[0]?.status === 2 ? 'up' : 'down';
+        logs.push(status);
+        if (logs.length > MAX_BARS) logs.shift();
+        drawBars();
+      } catch {
+        logs.push('down');
+        if (logs.length > MAX_BARS) logs.shift();
+        drawBars();
       }
     }
 
-    function render() {
-      const keyword = searchInput.value.trim().toLowerCase();
-      let filtered = allData.filter(m =>
-        m.friendly_name.toLowerCase().includes(keyword)
-      );
-
-      const total = filtered.length;
-      const perPage = parseInt(perPageSelect.value);
-      const pageCount = Math.ceil(total / perPage);
-      const offset = (currentPage - 1) * perPage;
-      const pageData = filtered.slice(offset, offset + perPage);
-
-      // 状态统计
-      const up = filtered.filter(m => m.status === 2).length;
-      const down = total - up;
-      summary.textContent = `共 ${total} 个服务 | 🟢 正常：${up} | 🔴 异常：${down}`;
-
-      // 服务卡片渲染
-      statusDiv.innerHTML = "";
-      pageData.forEach(m => {
-        const div = document.createElement("div");
-        div.className = "service " + (m.status === 2 ? "up" : "down");
-        div.innerHTML = `
-          <strong>${m.friendly_name}</strong><br>
-          地址：<a href="${m.url}" target="_blank">${m.url}</a><br>
-          状态：${m.status === 2 ? "🟢 正常" : "🔴 异常"}<br>
-          稳定性：${m.all_time_uptime_ratio || "N/A"}%
-        `;
-        statusDiv.appendChild(div);
-      });
-
-      // 分页渲染
-      paginationDiv.innerHTML = "";
-      for (let i = 1; i <= pageCount; i++) {
-        const btn = document.createElement("button");
-        btn.textContent = i;
-        if (i === currentPage) btn.disabled = true;
-        btn.onclick = () => { currentPage = i; render(); };
-        paginationDiv.appendChild(btn);
+    function updateTimer() {
+      countdown--;
+      const now = new Date();
+      timeInfo.textContent = `Last updated ${now.toLocaleTimeString()} | Next update in ${countdown} sec.`;
+      if (countdown <= 0) {
+        countdown = 300;
+        checkService();
       }
-
-      // 图表渲染
-      const labels = filtered.map(m => m.friendly_name);
-      const data = filtered.map(m => parseFloat(m.all_time_uptime_ratio || "0"));
-
-      if (chartInstance) chartInstance.destroy();
-
-      chartInstance = new Chart(document.getElementById("uptimeChart"), {
-        type: "bar",
-        data: {
-          labels,
-          datasets: [{
-            label: "稳定性 (%)",
-            data,
-            backgroundColor: "#1e90ff"
-          }]
-        },
-        options: {
-          scales: {
-            y: { beginAtZero: true, max: 100 }
-          },
-          plugins: {
-            legend: { display: false }
-          }
-        }
-      });
     }
 
-    searchInput.addEventListener("input", () => { currentPage = 1; render(); });
-    perPageSelect.addEventListener("change", () => { currentPage = 1; render(); });
-
-    fetchStatus();
-    setInterval(fetchStatus, 60000); // 每 60 秒刷新
+    // 初始化
+    checkService();
+    setInterval(updateTimer, 1000);
   </script>
 </body>
 </html>
