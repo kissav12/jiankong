@@ -1,59 +1,59 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>服务状态监控</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
-    .service { margin: 10px 0; padding: 10px; border-left: 5px solid; }
-    .up { border-color: green; background: #e0f9e0; }
-    .down { border-color: red; background: #fbeaea; }
+    body {
+      font-family: 'Helvetica Neue', sans-serif;
+      padding: 2rem;
+      background-color: #f4f4f4;
+      color: #333;
+    }
+    h1 {
+      color: #222;
+      margin-bottom: 1rem;
+    }
+    pre {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 1rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+    .error {
+      color: red;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
   <h1>服务状态监控</h1>
-  <div id="status">加载中...</div>
+  <p>下方显示的是从 Cloudflare Worker 获取的状态：</p>
+  <pre id="output">加载中...</pre>
 
   <script>
-    const API_KEY = "u3058880-af90aff71ac0410c9773e928";
-<script>
-  fetch("https://quiet-meadow-d19c.mqqmengqiqi.workers.dev")
-    .then(response => response.json())
-    .then(data => {
-      const output = document.getElementById("output");
-      output.textContent = JSON.stringify(data, null, 2);
-    })
-    .catch(error => {
-      const output = document.getElementById("output");
-      output.textContent = "获取状态失败：" + error;
-    });
-</script>
+    async function fetchStatus() {
+      const output = document.getElementById('output');
+      try {
+        const response = await fetch("https://quiet-meadow-d19c.mqqmengqiqi.workers.dev", {
+          method: 'GET'
+        });
 
-<pre id="output">加载中...</pre>
+        if (!response.ok) {
+          throw new Error(`HTTP 错误: ${response.status}`);
+        }
 
-    fetch("https://api.uptimerobot.com/v2/getMonitors", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `api_key=${API_KEY}&format=json`
-    })
-    .then(res => res.json())
-    .then(data => {
-      const container = document.getElementById("status");
-      container.innerHTML = "";
-      data.monitors.forEach(m => {
-        const div = document.createElement("div");
-        div.className = "service " + (m.status === 2 ? "up" : "down");
-        div.innerHTML = `
-          <strong>${m.friendly_name}</strong><br>
-          地址：<a href="${m.url}" target="_blank">${m.url}</a><br>
-          状态：${m.status === 2 ? "🟢 正常" : "🔴 异常"}<br>
-          稳定性：${m.all_time_uptime_ratio}%`;
-        container.appendChild(div);
-      });
-    })
-    .catch(err => {
-      document.getElementById("status").innerText = "获取状态失败：" + err;
-    });
+        const data = await response.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (error) {
+        output.textContent = "获取状态失败：TypeError: " + error.message;
+        output.classList.add("error");
+      }
+    }
+
+    fetchStatus();
   </script>
 </body>
 </html>
