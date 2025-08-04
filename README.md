@@ -1,2 +1,45 @@
-# jiankong
-jiankong
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>服务状态监控</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
+    .service { margin: 10px 0; padding: 10px; border-left: 5px solid; }
+    .up { border-color: green; background: #e0f9e0; }
+    .down { border-color: red; background: #fbeaea; }
+  </style>
+</head>
+<body>
+  <h1>服务状态监控</h1>
+  <div id="status">加载中...</div>
+
+  <script>
+    const API_KEY = "你的_API_Key"; // 推荐替换为 Workers 代理地址
+
+    fetch("https://api.uptimerobot.com/v2/getMonitors", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `api_key=${API_KEY}&format=json`
+    })
+    .then(res => res.json())
+    .then(data => {
+      const container = document.getElementById("status");
+      container.innerHTML = "";
+      data.monitors.forEach(m => {
+        const div = document.createElement("div");
+        div.className = "service " + (m.status === 2 ? "up" : "down");
+        div.innerHTML = `
+          <strong>${m.friendly_name}</strong><br>
+          地址：<a href="${m.url}" target="_blank">${m.url}</a><br>
+          状态：${m.status === 2 ? "🟢 正常" : "🔴 异常"}<br>
+          稳定性：${m.all_time_uptime_ratio}%`;
+        container.appendChild(div);
+      });
+    })
+    .catch(err => {
+      document.getElementById("status").innerText = "获取状态失败：" + err;
+    });
+  </script>
+</body>
+</html>
