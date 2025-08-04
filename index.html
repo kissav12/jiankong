@@ -15,45 +15,19 @@
       color: #222;
       margin-bottom: 1rem;
     }
-    pre {
+    .service {
       background: #fff;
       border: 1px solid #ccc;
       padding: 1rem;
-      overflow-x: auto;
-      white-space: pre-wrap;
+      margin-bottom: 1rem;
     }
-    .error {
+    .status-up {
+      color: green;
+    }
+    .status-down {
       color: red;
-      font-weight: bold;
     }
   </style>
 </head>
 <body>
-  <h1>服务状态监控</h1>
-  <p>下方显示的是从 Cloudflare Worker 获取的状态：</p>
-  <pre id="output">加载中...</pre>
-
-  <script>
-    async function fetchStatus() {
-      const output = document.getElementById('output');
-      try {
-        const response = await fetch("https://quiet-meadow-d19c.mqqmengqiqi.workers.dev", {
-          method: 'GET'
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP 错误: ${response.status}`);
-        }
-
-        const data = await response.json();
-        output.textContent = JSON.stringify(data, null, 2);
-      } catch (error) {
-        output.textContent = "获取状态失败：TypeError: " + error.message;
-        output.classList.add("error");
-      }
-    }
-
-    fetchStatus();
-  </script>
-</body>
-</html>
+  <h1
