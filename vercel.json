@@ -1,0 +1,8 @@
+{
+  "cron": [
+    {
+      "path": "/api/itdog-monitor",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

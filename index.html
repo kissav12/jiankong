@@ -1,93 +1,58 @@
-project/
-├── api/
-│   └── itdog-monitor.js
-├── package.json
-├── vercel.json
-├── README.md
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ItDog 状态监控</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; background: #f4f4f4; color: #222; }
+    .dark { background: #1e1e1e; color: #ddd; }
+    .summary { margin-bottom: 1rem; }
+    .record { border-bottom: 1px solid #ccc; padding: 0.5rem 0; }
+    .fail { color: red; }
+    .ok { color: green; }
+    button { margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <h1>ItDog 状态监控</h1>
+  <div class="summary">
+    <span id="summary"></span>
+    <button onclick="toggleDark()">切换暗黑模式</button>
+  </div>
+  <div id="records">加载中...</div>
 
-// api/itdog-monitor.js
-import puppeteer from 'puppeteer';
-
-export default async function handler(req, res) {
-  const url = 'https://www.itdog.cn/http/';
-  const testDomain = 'https://2887.temsxpom.cc/';
-
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
-  const page = await browser.newPage();
-
-  try {
-    await page.goto(url);
-    await page.type('input[type=text]', testDomain);
-    await page.click('button:has-text("快速测试")');
-
-    // 等待测试结果出现
-    await page.waitForSelector('.fail-count', { timeout: 15000 });
-
-    const result = await page.evaluate(() => {
-      const failEl = document.querySelector('.fail-count');
-      const failCount = parseInt(failEl?.textContent ?? '0');
-      const availability = 100 - failCount;
-      return {
-        failCount,
-        availability: availability < 0 ? 0 : availability,
-      };
-    });
-
-    await browser.close();
-    return res.status(200).json({ success: true, data: result });
-  } catch (err) {
-    await browser.close();
-    return res.status(500).json({ success: false, error: err.message });
-  }
-}
-
-// package.json
-{
-  "name": "itdog-monitor",
-  "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
-    "puppeteer": "^21.3.8"
-  }
-}
-
-// vercel.json
-{
-  "functions": {
-    "api/itdog-monitor.js": {
-      "memory": 1024,
-      "maxDuration": 30
+  <script>
+    async function fetchData() {
+      try {
+        const res = await fetch("/api/itdog-monitor");
+        const json = await res.json();
+        const container = document.getElementById("records");
+        container.innerHTML = "";
+        let fail = json.failures;
+        let total = json.total;
+        document.getElementById("summary").textContent = 
+          `共检测 ${total} 次，失败 ${fail} 次，可用率 ${((1 - fail / total) * 100).toFixed(2)}%`;
+        json.history.forEach(item => {
+          const div = document.createElement("div");
+          div.className = "record";
+          div.innerHTML = `<span>${item.time}</span> - 
+            <span class="${item.fail ? 'fail' : 'ok'}">
+              ${item.fail ? '失败' : '正常'}
+            </span> - 失败数: ${item.fail}`;
+          container.appendChild(div);
+        });
+      } catch (e) {
+        document.getElementById("records").textContent = "获取失败：" + e;
+      }
     }
-  }
-}
 
-// README.md
-# itdog-monitor
+    function toggleDark() {
+      document.body.classList.toggle("dark");
+    }
 
-使用 Puppeteer 抓取 itdog.cn 网站监控状态，部署于 Vercel。
-
-## API Endpoint
-
-```
-GET https://your-project.vercel.app/api/itdog-monitor
-```
-
-## 返回格式
-
-```json
-{
-  "success": true,
-  "data": {
-    "failCount": 5,
-    "availability": 95
-  }
-}
-```
-
-## 注意事项
-- 默认测试 https://2887.temsxpom.cc/
-- 可修改 `itdog-monitor.js` 中的 `testDomain`
-- 运行 Puppeteer 需要无沙箱参数
+    fetchData();
+    setInterval(fetchData, 300000); // 每 5 分钟刷新
+  </script>
+</body>
+</html>
